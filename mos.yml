@@ -12,6 +12,9 @@ config_schema:
   - ["rpc.uart.fc_enable", "b", {title: "Enable hardware FC"}]
   - ["rpc.uart.wait_for_start_frame", "b", true, {title: "Wait for an incoming frame before using the channel"}]
 
+libs:
+  - origin: https://github.com/mongoose-os-libs/rpc-common
+
 tags:
   - c
   - rpc

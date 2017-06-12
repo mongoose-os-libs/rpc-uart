@@ -4,19 +4,17 @@
  */
 
 #include "mgos_rpc_channel_uart.h"
+#include "mg_rpc.h"
+#include "mgos_rpc.h"
 
 #include "fw/src/mgos_debug.h"
 #include "fw/src/mgos_sys_config.h"
-#include "fw/src/mgos_rpc.h"
 #include "fw/src/mgos_uart.h"
 #include "fw/src/mgos_utils.h"
-
-#if MGOS_ENABLE_RPC
 
 #include "common/cs_crc32.h"
 #include "common/cs_dbg.h"
 #include "common/mbuf.h"
-#include "common/mg_rpc/mg_rpc.h"
 #include "common/str_util.h"
 
 #define EOF_CHAR "\x04"
@@ -265,5 +263,3 @@ bool mgos_rpc_uart_init(void) {
 
   return true;
 }
-
-#endif /* MGOS_ENABLE_RPC */

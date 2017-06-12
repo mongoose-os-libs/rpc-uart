@@ -8,9 +8,7 @@
 
 #include <stdbool.h>
 
-#include "common/mg_rpc/mg_rpc_channel.h"
-
-#if MGOS_ENABLE_RPC
+#include "mg_rpc_channel.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,5 +21,4 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
 }
 #endif /* __cplusplus */
 
-#endif /* MGOS_ENABLE_RPC */
 #endif /* CS_FW_SRC_MGOS_MG_RPC_CHANNEL_UART_H_ */
