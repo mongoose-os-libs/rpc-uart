@@ -252,8 +252,9 @@ bool mgos_rpc_uart_init(void) {
     }
     if (ok) {
       struct mg_rpc_channel *uch =
-        mg_rpc_channel_uart(scucfg->uart_no, scucfg->wait_for_start_frame);
-      mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch, true /* is_trusted */);
+          mg_rpc_channel_uart(scucfg->uart_no, scucfg->wait_for_start_frame);
+      mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch,
+                         true /* is_trusted */);
       uch->ch_connect(uch);
     } else {
       LOG(LL_ERROR, ("UART%d init failed", scucfg->uart_no));
