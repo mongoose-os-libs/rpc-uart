@@ -215,6 +215,11 @@ static bool mg_rpc_channel_uart_is_persistent(struct mg_rpc_channel *ch) {
   return true;
 }
 
+static char *mg_rpc_channel_uart_get_info(struct mg_rpc_channel *ch) {
+  (void) ch;
+  return NULL;
+}
+
 struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
                                            bool wait_for_start_frame) {
   struct mg_rpc_channel *ch = (struct mg_rpc_channel *) calloc(1, sizeof(*ch));
@@ -224,6 +229,7 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
   ch->ch_destroy = mg_rpc_channel_uart_ch_destroy;
   ch->get_type = mg_rpc_channel_uart_get_type;
   ch->is_persistent = mg_rpc_channel_uart_is_persistent;
+  ch->get_info = mg_rpc_channel_uart_get_info;
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) calloc(1, sizeof(*chd));
   chd->uart_no = uart_no;
