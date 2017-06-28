@@ -245,18 +245,20 @@ bool mgos_rpc_uart_init(void) {
   const struct sys_config_rpc *sccfg = &get_cfg()->rpc;
   if (sccfg->uart.uart_no >= 0) {
     const struct sys_config_rpc_uart *scucfg = &get_cfg()->rpc.uart;
-    bool ok = true;
-    /* Only reconfigure UART if it is not one of debug ports */
-    if (scucfg->uart_no != mgos_get_stdout_uart() &&
-        scucfg->uart_no != mgos_get_stderr_uart()) {
-      struct mgos_uart_config ucfg;
+    struct mgos_uart_config ucfg;
+    /* If UART is already configured (presumably for debug)
+     * keep all the settings except maybe flow control */
+    if (mgos_uart_config_get(scucfg->uart_no, &ucfg)) {
+      mgos_uart_flush(scucfg->uart_no);
+      ucfg.rx_fc_type = ucfg.tx_fc_type =
+          (enum mgos_uart_fc_type) scucfg->fc_type;
+    } else {
       mgos_uart_config_set_defaults(scucfg->uart_no, &ucfg);
       ucfg.baud_rate = scucfg->baud_rate;
-      ucfg.rx_fc_ena = ucfg.tx_fc_ena = scucfg->fc_enable;
-      mgos_uart_flush(scucfg->uart_no);
-      ok = mgos_uart_configure(scucfg->uart_no, &ucfg);
+      ucfg.rx_fc_type = ucfg.tx_fc_type =
+          (enum mgos_uart_fc_type) scucfg->fc_type;
     }
-    if (ok) {
+    if (mgos_uart_configure(scucfg->uart_no, &ucfg)) {
       struct mg_rpc_channel *uch =
           mg_rpc_channel_uart(scucfg->uart_no, scucfg->wait_for_start_frame);
       mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch,
