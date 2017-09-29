@@ -5,6 +5,8 @@ version: 1.0
 
 sources:
   - src
+includes:
+  - include
 config_schema:
   - ["rpc.uart", "o", {title: "RPC-over-UART settings"}]
   - ["rpc.uart.uart_no", "i", {title: "UART number (-1 to disable)"}]
