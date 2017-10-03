@@ -224,8 +224,11 @@ static bool mg_rpc_channel_uart_is_persistent(struct mg_rpc_channel *ch) {
 }
 
 static char *mg_rpc_channel_uart_get_info(struct mg_rpc_channel *ch) {
-  (void) ch;
-  return NULL;
+  struct mg_rpc_channel_uart_data *chd =
+      (struct mg_rpc_channel_uart_data *) ch->channel_data;
+  char *res = NULL;
+  mg_asprintf(&res, 0, "UART%d", chd->uart_no);
+  return res;
 }
 
 struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
