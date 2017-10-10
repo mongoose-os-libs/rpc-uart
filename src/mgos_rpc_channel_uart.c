@@ -121,7 +121,7 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
       mbuf_remove(urxb, flen + FRAME_DELIMETER_LEN);
     }
     if ((int) urxb->len >
-        get_cfg()->rpc.max_frame_size + 2 * FRAME_DELIMETER_LEN) {
+        mgos_sys_config_get_rpc_max_frame_size() + 2 * FRAME_DELIMETER_LEN) {
       LOG(LL_ERROR, ("Incoming frame is too big, dropping."));
       mbuf_remove(urxb, urxb->len);
     }
@@ -254,10 +254,10 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
 }
 
 bool mgos_rpc_uart_init(void) {
-  const struct sys_config_rpc *sccfg = &get_cfg()->rpc;
+  const struct mgos_config_rpc *sccfg = mgos_sys_config_get_rpc();
   if (mgos_rpc_get_global() == NULL || sccfg->uart.uart_no < 0) return true;
 
-  const struct sys_config_rpc_uart *scucfg = &get_cfg()->rpc.uart;
+  const struct mgos_config_rpc_uart *scucfg = mgos_sys_config_get_rpc_uart();
   struct mgos_uart_config ucfg;
   /* If UART is already configured (presumably for debug)
    * keep all the settings except maybe flow control */
