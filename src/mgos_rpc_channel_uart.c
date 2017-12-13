@@ -222,11 +222,6 @@ static bool mg_rpc_channel_uart_get_authn_info(struct mg_rpc_channel *ch,
   return false;
 }
 
-static bool mg_rpc_channel_uart_is_persistent(struct mg_rpc_channel *ch) {
-  (void) ch;
-  return true;
-}
-
 static char *mg_rpc_channel_uart_get_info(struct mg_rpc_channel *ch) {
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) ch->channel_data;
@@ -243,7 +238,8 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
   ch->ch_close = mg_rpc_channel_uart_ch_close;
   ch->ch_destroy = mg_rpc_channel_uart_ch_destroy;
   ch->get_type = mg_rpc_channel_uart_get_type;
-  ch->is_persistent = mg_rpc_channel_uart_is_persistent;
+  ch->is_persistent = mg_rpc_channel_true;
+  ch->is_broadcast_enabled = mg_rpc_channel_true;
   ch->get_authn_info = mg_rpc_channel_uart_get_authn_info;
   ch->get_info = mg_rpc_channel_uart_get_info;
   struct mg_rpc_channel_uart_data *chd =
