@@ -210,10 +210,9 @@ static const char *mg_rpc_channel_uart_get_type(struct mg_rpc_channel *ch) {
   return "UART";
 }
 
-static bool mg_rpc_channel_uart_get_authn_info(struct mg_rpc_channel *ch,
-                                               const char *auth_domain,
-                                               const char *auth_file,
-                                               struct mg_rpc_authn *authn) {
+static bool mg_rpc_channel_uart_get_authn_info(
+    struct mg_rpc_channel *ch, const char *auth_domain, const char *auth_file,
+    struct mg_rpc_authn_info *authn) {
   (void) ch;
   (void) auth_domain;
   (void) auth_file;
