@@ -1,3 +1,2 @@
 config_schema:
-  # Valid only for NUCLEO boards, need to figure out how to set for others.
-  - ["rpc.uart.uart_no", 3]
+  - ["rpc.uart.uart_no", 1]
