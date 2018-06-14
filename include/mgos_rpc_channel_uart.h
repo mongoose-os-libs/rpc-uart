@@ -26,8 +26,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
-                                           bool wait_for_start_frame);
+struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no);
 
 #ifdef __cplusplus
 }

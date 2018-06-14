@@ -30,41 +30,47 @@
 #include "common/str_util.h"
 
 #define EOF_CHAR "\x04"
-#define FRAME_DELIMETER "\"\"\""
-#define FRAME_DELIMETER_LEN 3
+
+/* Old delimiter */
+#define FRAME_DELIM_1 "\"\"\""
+#define FRAME_DELIM_1_LEN 3
+/* New delimiter (as of 2018/06/14). */
+#define FRAME_DELIM_2 "\n"
+#define FRAME_DELIM_2_LEN 1
 
 struct mg_rpc_channel_uart_data {
   int uart_no;
-  unsigned int wait_for_start_frame : 1;
-  unsigned int waiting_for_start_frame : 1;
   unsigned int connected : 1;
   unsigned int sending : 1;
   unsigned int sending_user_frame : 1;
   unsigned int resume_uart : 1;
+  unsigned int delim_1_used : 1;
+  unsigned int crc_used : 1;
   struct mbuf recv_mbuf;
   struct mbuf send_mbuf;
 };
 
 /*
- * mgos client expects the following sequence:
+ * A bunch of things related to FRAME_DELIM_1 is for backward compatibility.
+ * As of 2018/06/14, the situation is much simpler: we expect one JSON frame
+ * per line, optionally followed by comma-separated metadata fields.
+ * Of these, currently only one is defined: CRC32. So, these are all valid:
  *
- *        MGOS              DEVICE
- *        -->  EOF_CHAR"""        (mgos sends continuosly, expecting """)
- *        <--  EOF_CHAR"""        (device replies with """ saying it's ready)
- *        -->  """{request_frame}"""  (mgos sends a frame)
- *                                    at this point we disable UART logs
- *        <--  """{response_frame}""" (device responds)
- *                                    at this point we re-enable UART logs
+ *   {"method":"Sys.GetInfo"}
+ *   {"method":"Sys.GetInfo"}010a4ff9
+ *   {"method":"Sys.GetInfo"}010a4ff9,a,b
  *
- * Our side (a device side) must keep UART disabled after we have received
- * EOF_CHAR""" marker, and until we have sent a response.
- *
- * Note that when we have sent a """ ready marker, some time may pass but we
- * have to keep the UART disabled. That's why `chd->sending_user_frame` flag
- * is introduced: it is set only when a frame has been sent by the user code.
- * Note that the user handler may call LOG, so it's important to keep
- * UART disabled during RPC callback execution.
+ * If CRC is not supplied, it is not validated.
+ * If caller supplies CRC, it will get CRC on the frames sent in its direction.
  */
+
+static bool is_empty_frame(const struct mg_str f) {
+  for (size_t i = 0; i < f.len; i++) {
+    if (!isspace((int) f.p[i])) return false;
+  }
+  return true;
+}
+
 void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
   struct mg_rpc_channel *ch = (struct mg_rpc_channel *) arg;
   struct mg_rpc_channel_uart_data *chd =
@@ -76,10 +82,24 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
     struct mbuf *urxb = &chd->recv_mbuf;
 
     mgos_uart_read_mbuf(uart_no, urxb, rx_av);
-    while ((end = c_strnstr(urxb->buf, FRAME_DELIMETER, urxb->len)) != NULL) {
-      flen = (end - urxb->buf);
-      if (flen != 0) {
-        struct mg_str f = mg_mk_str_n((const char *) urxb->buf, flen);
+    while (true) {
+      end = c_strnstr(urxb->buf, FRAME_DELIM_1, urxb->len);
+      if (end != NULL) {
+        chd->delim_1_used = true; /* Turn on compat mode. */
+        flen = end - urxb->buf;
+        end += FRAME_DELIM_1_LEN;
+      }
+      if (end == NULL) {
+        end = c_strnstr(urxb->buf, FRAME_DELIM_2, urxb->len);
+        if (end != NULL) {
+          flen = end - urxb->buf;
+          end += FRAME_DELIM_2_LEN;
+        } else {
+          break;
+        }
+      }
+      struct mg_str f = mg_mk_str_n((const char *) urxb->buf, flen);
+      if (!is_empty_frame(f)) {
         /*
          * EOF_CHAR is used to turn off interactive console. If the frame is
          * just EOF_CHAR by itself, we'll immediately send a frame containing
@@ -87,14 +107,9 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
          * otherwise we'll handle the frame.
          */
         if (mg_vcmp(&f, EOF_CHAR) == 0) {
-          chd->waiting_for_start_frame = false;
-          if (!chd->connected) {
-            chd->connected = true;
-            ch->ev_handler(ch, MG_RPC_CHANNEL_OPEN, NULL);
-          }
-          mbuf_append(&chd->send_mbuf, FRAME_DELIMETER, FRAME_DELIMETER_LEN);
+          mbuf_append(&chd->send_mbuf, FRAME_DELIM_1, FRAME_DELIM_1_LEN);
           mbuf_append(&chd->send_mbuf, EOF_CHAR, 1);
-          mbuf_append(&chd->send_mbuf, FRAME_DELIMETER, FRAME_DELIMETER_LEN);
+          mbuf_append(&chd->send_mbuf, FRAME_DELIM_1, FRAME_DELIM_1_LEN);
           chd->sending = true;
         } else {
           /*
@@ -123,22 +138,24 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
                    (int) f.len, (int) f.len, f.p, (int) meta.len, meta.p,
                    (unsigned int) expected_crc, (unsigned int) crc));
               f.len = 0;
+            } else {
+              chd->crc_used = true;
             }
           }
           if (f.len > 0) {
             ch->ev_handler(ch, MG_RPC_CHANNEL_FRAME_RECD, &f);
           }
         }
+      } else {
+        /* Respond with an empty frame to an empty frame */
+        mbuf_append(&chd->send_mbuf, FRAME_DELIM_2, FRAME_DELIM_2_LEN);
       }
-      mbuf_remove(urxb, flen + FRAME_DELIMETER_LEN);
+      mbuf_remove(urxb, (end - urxb->buf));
     }
     if ((int) urxb->len >
-        mgos_sys_config_get_rpc_max_frame_size() + 2 * FRAME_DELIMETER_LEN) {
+        mgos_sys_config_get_rpc_max_frame_size() + 2 * FRAME_DELIM_1_LEN) {
       LOG(LL_ERROR, ("Incoming frame is too big, dropping."));
       mbuf_remove(urxb, urxb->len);
-    }
-    if (chd->waiting_for_start_frame && urxb->len > FRAME_DELIMETER_LEN) {
-      mbuf_remove(urxb, urxb->len - FRAME_DELIMETER_LEN);
     }
     mbuf_trim(urxb);
   }
@@ -167,9 +184,10 @@ static void mg_rpc_channel_uart_ch_connect(struct mg_rpc_channel *ch) {
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) ch->channel_data;
   if (!chd->connected) {
-    chd->waiting_for_start_frame = chd->wait_for_start_frame;
     mgos_uart_set_dispatcher(chd->uart_no, mg_rpc_channel_uart_dispatcher, ch);
     mgos_uart_set_rx_enabled(chd->uart_no, true);
+    chd->connected = true;
+    ch->ev_handler(ch, MG_RPC_CHANNEL_OPEN, NULL);
   }
 }
 
@@ -178,12 +196,20 @@ static bool mg_rpc_channel_uart_send_frame(struct mg_rpc_channel *ch,
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) ch->channel_data;
   if (!chd->connected || chd->sending) return false;
-  mbuf_append(&chd->send_mbuf, FRAME_DELIMETER, FRAME_DELIMETER_LEN);
+  mbuf_append(&chd->send_mbuf, FRAME_DELIM_2, FRAME_DELIM_2_LEN);
+  if (chd->delim_1_used) {
+    mbuf_append(&chd->send_mbuf, FRAME_DELIM_1, FRAME_DELIM_1_LEN);
+  }
   mbuf_append(&chd->send_mbuf, f.p, f.len);
-  char crc_hex[9];
-  sprintf(crc_hex, "%08x", (unsigned int) cs_crc32(0, f.p, f.len));
-  mbuf_append(&chd->send_mbuf, crc_hex, 8);
-  mbuf_append(&chd->send_mbuf, FRAME_DELIMETER, FRAME_DELIMETER_LEN);
+  if (chd->crc_used) {
+    char crc_hex[9];
+    sprintf(crc_hex, "%08x", (unsigned int) cs_crc32(0, f.p, f.len));
+    mbuf_append(&chd->send_mbuf, crc_hex, 8);
+  }
+  if (chd->delim_1_used) {
+    mbuf_append(&chd->send_mbuf, FRAME_DELIM_1, FRAME_DELIM_1_LEN);
+  }
+  mbuf_append(&chd->send_mbuf, FRAME_DELIM_2, FRAME_DELIM_2_LEN);
   chd->sending = chd->sending_user_frame = true;
 
   /* Disable UART console while sending. */
@@ -241,8 +267,7 @@ static char *mg_rpc_channel_uart_get_info(struct mg_rpc_channel *ch) {
   return res;
 }
 
-struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
-                                           bool wait_for_start_frame) {
+struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no) {
   struct mg_rpc_channel *ch = (struct mg_rpc_channel *) calloc(1, sizeof(*ch));
   ch->ch_connect = mg_rpc_channel_uart_ch_connect;
   ch->send_frame = mg_rpc_channel_uart_send_frame;
@@ -256,7 +281,6 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no,
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) calloc(1, sizeof(*chd));
   chd->uart_no = uart_no;
-  chd->wait_for_start_frame = wait_for_start_frame;
   mbuf_init(&chd->recv_mbuf, 0);
   mbuf_init(&chd->send_mbuf, 0);
   ch->channel_data = chd;
@@ -283,8 +307,7 @@ bool mgos_rpc_uart_init(void) {
         (enum mgos_uart_fc_type) scucfg->fc_type;
   }
   if (mgos_uart_configure(scucfg->uart_no, &ucfg)) {
-    struct mg_rpc_channel *uch =
-        mg_rpc_channel_uart(scucfg->uart_no, scucfg->wait_for_start_frame);
+    struct mg_rpc_channel *uch = mg_rpc_channel_uart(scucfg->uart_no);
     mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch);
     uch->ch_connect(uch);
   } else {
