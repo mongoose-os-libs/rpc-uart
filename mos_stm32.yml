@@ -1,2 +1,9 @@
-config_schema:
-  - ["rpc.uart.uart_no", 1]
+conds:
+  - when: build_vars.BOARD == "DISCO-F746NG"
+    apply:
+      config_schema:
+        - ["rpc.uart.uart_no", 1]
+  - when: build_vars.BOARD == "NUCLEO-F746ZG"
+    apply:
+      config_schema:
+        - ["rpc.uart.uart_no", 5]
