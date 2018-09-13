@@ -20,5 +20,6 @@ tags:
   - c
   - rpc
   - uart
+  - docs:rpc:RPC over UART
 
 manifest_version: 2017-09-29
