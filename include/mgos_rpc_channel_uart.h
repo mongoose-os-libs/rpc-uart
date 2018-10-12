@@ -21,12 +21,16 @@
 #include <stdbool.h>
 
 #include "mg_rpc_channel.h"
+#include "mgos_sys_config.h"
+#include "mgos_uart.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no);
+struct mg_rpc_channel *mg_rpc_channel_uart(
+    const struct mgos_config_rpc_uart *cfg,
+    const struct mgos_uart_config *ucfg);
 
 #ifdef __cplusplus
 }

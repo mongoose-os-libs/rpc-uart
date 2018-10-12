@@ -267,7 +267,30 @@ static char *mg_rpc_channel_uart_get_info(struct mg_rpc_channel *ch) {
   return res;
 }
 
-struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no) {
+struct mg_rpc_channel *mg_rpc_channel_uart(
+    const struct mgos_config_rpc_uart *ccfg,
+    const struct mgos_uart_config *ucfg) {
+  struct mgos_uart_config ucfg_t;
+  if (ucfg == NULL) {
+    /* If UART is already configured (presumably for debug)
+     * keep all the settings except maybe flow control */
+    if (mgos_uart_config_get(ccfg->uart_no, &ucfg_t)) {
+      mgos_uart_flush(ccfg->uart_no);
+      ucfg_t.rx_fc_type = ucfg_t.tx_fc_type =
+          (enum mgos_uart_fc_type) ccfg->fc_type;
+    } else {
+      mgos_uart_config_set_defaults(ccfg->uart_no, &ucfg_t);
+      ucfg_t.baud_rate = ccfg->baud_rate;
+      ucfg_t.rx_fc_type = ucfg_t.tx_fc_type =
+          (enum mgos_uart_fc_type) ccfg->fc_type;
+    }
+    ucfg = &ucfg_t;
+  }
+  if (!mgos_uart_configure(ccfg->uart_no, ucfg)) {
+    LOG(LL_ERROR, ("UART%d init failed", ccfg->uart_no));
+    return NULL;
+  }
+
   struct mg_rpc_channel *ch = (struct mg_rpc_channel *) calloc(1, sizeof(*ch));
   ch->ch_connect = mg_rpc_channel_uart_ch_connect;
   ch->send_frame = mg_rpc_channel_uart_send_frame;
@@ -280,11 +303,11 @@ struct mg_rpc_channel *mg_rpc_channel_uart(int uart_no) {
   ch->get_info = mg_rpc_channel_uart_get_info;
   struct mg_rpc_channel_uart_data *chd =
       (struct mg_rpc_channel_uart_data *) calloc(1, sizeof(*chd));
-  chd->uart_no = uart_no;
+  chd->uart_no = ccfg->uart_no;
   mbuf_init(&chd->recv_mbuf, 0);
   mbuf_init(&chd->send_mbuf, 0);
   ch->channel_data = chd;
-  LOG(LL_INFO, ("%p UART%d", ch, uart_no));
+  LOG(LL_INFO, ("%p UART%d", ch, chd->uart_no));
   return ch;
 }
 
@@ -292,28 +315,13 @@ bool mgos_rpc_uart_init(void) {
   const struct mgos_config_rpc *sccfg = mgos_sys_config_get_rpc();
   if (mgos_rpc_get_global() == NULL || sccfg->uart.uart_no < 0) return true;
 
-  const struct mgos_config_rpc_uart *scucfg = mgos_sys_config_get_rpc_uart();
-  struct mgos_uart_config ucfg;
-  /* If UART is already configured (presumably for debug)
-   * keep all the settings except maybe flow control */
-  if (mgos_uart_config_get(scucfg->uart_no, &ucfg)) {
-    mgos_uart_flush(scucfg->uart_no);
-    ucfg.rx_fc_type = ucfg.tx_fc_type =
-        (enum mgos_uart_fc_type) scucfg->fc_type;
-  } else {
-    mgos_uart_config_set_defaults(scucfg->uart_no, &ucfg);
-    ucfg.baud_rate = scucfg->baud_rate;
-    ucfg.rx_fc_type = ucfg.tx_fc_type =
-        (enum mgos_uart_fc_type) scucfg->fc_type;
-  }
-  if (mgos_uart_configure(scucfg->uart_no, &ucfg)) {
-    struct mg_rpc_channel *uch = mg_rpc_channel_uart(scucfg->uart_no);
-    mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch);
-    uch->ch_connect(uch);
-  } else {
-    LOG(LL_ERROR, ("UART%d init failed", scucfg->uart_no));
+  struct mg_rpc_channel *uch = mg_rpc_channel_uart(&sccfg->uart, NULL);
+  if (uch == NULL) {
     return false;
   }
+
+  mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch);
+  uch->ch_connect(uch);
 
   return true;
 }
