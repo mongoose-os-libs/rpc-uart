@@ -320,7 +320,8 @@ bool mgos_rpc_uart_init(void) {
     return false;
   }
 
-  mg_rpc_add_channel(mgos_rpc_get_global(), mg_mk_str(""), uch);
+  mg_rpc_add_channel(mgos_rpc_get_global(),
+                     mg_mk_str(mgos_sys_config_get_rpc_uart_dst()), uch);
   uch->ch_connect(uch);
 
   return true;
