@@ -112,12 +112,15 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
           mbuf_append(&chd->send_mbuf, FRAME_DELIM_1, FRAME_DELIM_1_LEN);
           chd->sending = true;
         } else {
+          /* Skip junk in front. */
+          while (f.len > 0 && *f.p != '{') {
+            f.len--;
+            f.p++;
+          }
           /*
            * Frame may be followed by metadata, which is a comma-separated
-           * list of values. Right now, only one field is epxected:
+           * list of values. Right now, only one field is expected:
            * CRC32 checksum as a hex number.
-           * TODO(rojer): Make it mandatory when updated mos has been out for
-           * a while (today is 2017/03/28).
            */
           struct mg_str meta = mg_mk_str_n(f.p + f.len, 0);
           while (meta.p > f.p) {
