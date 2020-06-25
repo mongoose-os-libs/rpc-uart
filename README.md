@@ -13,5 +13,10 @@ static bool mg_rpc_channel_uart_send_frame(struct mg_rpc_channel *ch,const struc
 ```
 - Uart rpc config
 ```C
-struct mg_rpc_channel *mg_rpc_channel_uart( const struct mgos_config_rpc_uart *ccfg,const struct mgos_uart_config *ucfg); 
+struct mg_rpc_channel *mg_rpc_channel_uart( const struct mgos_config_rpc_uart *ccfg,
+                                              const struct mgos_uart_config *ucfg); 
+```
+- check if config was correct
+```C
+bool mgos_rpc_uart_init(void)
 ```
