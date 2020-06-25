@@ -12,7 +12,9 @@ static void mg_rpc_channel_uart_ch_connect(struct mg_rpc_channel *ch);
 static bool mg_rpc_channel_uart_send_frame(struct mg_rpc_channel *ch,
                                            const struct mg_str f);
 ```
-- Uart dispatcher
+- Uart rpc config
 ```C
-void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg);
+struct mg_rpc_channel *mg_rpc_channel_uart(
+    const struct mgos_config_rpc_uart *ccfg,
+    const struct mgos_uart_config *ucfg); 
 ```
