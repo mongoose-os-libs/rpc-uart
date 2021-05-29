@@ -15,7 +15,7 @@ config_schema:
   - ["rpc.uart.dst", "s", "", {title: "Destination reachable via this channel"}]
 
 libs:
-  - origin: https://github.com/mongoose-os-libs/rpc-common
+  - location: https://github.com/mongoose-os-libs/rpc-common
 
 tags:
   - c
