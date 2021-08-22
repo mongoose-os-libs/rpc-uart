@@ -80,9 +80,16 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
     size_t flen = 0;
     const char *end;
     struct mbuf *urxb = &chd->recv_mbuf;
-
+    size_t len_before = urxb->len;
     mgos_uart_read_mbuf(uart_no, urxb, rx_av);
-    while (true) {
+    size_t len_after = urxb->len;
+    for (size_t i = len_before; i < len_after; i++) {
+      if (urxb->buf[i] >= 0x80) {
+        mbuf_clear(urxb);  /* Not allowed by JSON - garbage. */
+        break;
+      }
+    }
+    while (urxb->len > 0) {
       end = c_strnstr(urxb->buf, FRAME_DELIM_1, urxb->len);
       if (end != NULL) {
         chd->delim_1_used = true; /* Turn on compat mode. */
@@ -95,6 +102,9 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
           flen = end - urxb->buf;
           end += FRAME_DELIM_2_LEN;
         } else {
+          if (urxb->buf[0] != '{') {
+            mbuf_clear(urxb);  /* Not a JSON object - garbage. */
+          }
           break;
         }
       }
