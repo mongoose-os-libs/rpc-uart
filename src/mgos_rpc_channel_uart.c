@@ -84,7 +84,7 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
     mgos_uart_read_mbuf(uart_no, urxb, rx_av);
     size_t len_after = urxb->len;
     for (size_t i = len_before; i < len_after; i++) {
-      if (urxb->buf[i] >= 0x80) {
+      if ((uint8_t) urxb->buf[i] >= 0x80) {
         mbuf_clear(urxb);  /* Not allowed by JSON - garbage. */
         break;
       }
