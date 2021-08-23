@@ -85,7 +85,7 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
     size_t len_after = urxb->len;
     for (size_t i = len_before; i < len_after; i++) {
       if ((uint8_t) urxb->buf[i] >= 0x80) {
-        mbuf_clear(urxb);  /* Not allowed by JSON - garbage. */
+        mbuf_clear(urxb); /* Not allowed by JSON - garbage. */
         break;
       }
     }
@@ -102,9 +102,12 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
           flen = end - urxb->buf;
           end += FRAME_DELIM_2_LEN;
         } else {
-          if (urxb->buf[0] != '{') {
-            mbuf_clear(urxb);  /* Not a JSON object - garbage. */
+          size_t garbage_len = 0;
+          for (size_t i = 0; i < urxb->len; i++) {
+            if (urxb->buf[i] == '{') break;
+            garbage_len++;
           }
+          if (garbage_len > 0) mbuf_remove(urxb, garbage_len);
           break;
         }
       }
