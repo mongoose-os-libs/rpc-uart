@@ -102,12 +102,6 @@ void mg_rpc_channel_uart_dispatcher(int uart_no, void *arg) {
           flen = end - urxb->buf;
           end += FRAME_DELIM_2_LEN;
         } else {
-          size_t garbage_len = 0;
-          for (size_t i = 0; i < urxb->len; i++) {
-            if (urxb->buf[i] == '{') break;
-            garbage_len++;
-          }
-          if (garbage_len > 0) mbuf_remove(urxb, garbage_len);
           break;
         }
       }
